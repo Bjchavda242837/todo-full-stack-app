@@ -31,8 +31,6 @@ app.post("/signup", logger, function (req, res) {
   const username = req.body.username;
   const password = req.body.password;
 
-  
-
   users.push({
     username: username,
     password: password,
@@ -65,6 +63,7 @@ app.post("/signin", logger, function (req, res) {
 
       res.json({
         token: token,
+        Massage: "You are signed in"
       });
     } catch (error) {
       console.error(error);
