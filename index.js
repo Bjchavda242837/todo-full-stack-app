@@ -63,7 +63,7 @@ app.post("/signin", logger, function (req, res) {
 
       res.json({
         token: token,
-        Massage: "You are signed in"
+        Massage: "You are signed in",
       });
     } catch (error) {
       console.error(error);
@@ -121,23 +121,36 @@ app.get("/todos", logger, auth, function (req, res) {
 //todo
 app.post("/todo", logger, auth, function (req, res) {
   const currentuser = req.username;
-  const todo = req.body.todo;
+  // Accept either 'title' or 'todo' from body
+  const title = req.body.title || req.body.todo;
 
-  const title = todo;
-  const id = todos.length + 1;
-  const username = currentuser;
+  // 1. Input Validation
+  if (!title) {
+    return res.status(400).json({
+      message: "Todo title is required",
+    });
+  }
 
-  const todoObj = {
-    id: id,
-    title: title,
-    username: username,
-  };
+  try {
+    const todoObj = {
+      id: Date.now(), // Safe unique ID using timestamp
+      title: title,
+      completed: false,
+      username: currentuser,
+    };
 
-  todos.push(todoObj);
+    todos.push(todoObj);
 
-  res.json({
-    todoitem: todoObj,
-  });
+    // 2. Return 201 Created Status
+    res.status(201).json({
+      todoitem: todoObj,
+    });
+  } catch (error) {
+    console.error("Error creating todo:", error);
+    res.status(500).json({
+      message: "Internal server error",
+    });
+  }
 });
 
 app.listen(3000);

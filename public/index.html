@@ -8,49 +8,59 @@
   <body>
     <h1>Todo Auth app</h1>
 
-    <div>
-      <h2>SignUp</h2>
+    <div id="auth-section">
+      <div>
+        <h2>SignUp</h2>
 
-      <input
-        type="text"
-        id="signup-username"
-        name="signup-username"
-        ,
-        placeholder="username"
-      />
-      <input
-        type="text"
-        id="signup-password"
-        name="signup-password"
-        ,
-        placeholder="password"
-      />
-      <button onclick="SignUp()">Submit</button>
+        <input
+          type="text"
+          id="signup-username"
+          name="signup-username"
+          ,
+          placeholder="username"
+        />
+        <input
+          type="text"
+          id="signup-password"
+          name="signup-password"
+          ,
+          placeholder="password"
+        />
+        <button onclick="SignUp()">Submit</button>
+      </div>
+
+      <div>
+        <h2>SignIn</h2>
+
+        <input
+          type="text"
+          id="signin-username"
+          name="signin-username"
+          ,
+          placeholder="username"
+        />
+        <input
+          type="text"
+          id="signin-password"
+          name="signin-password"
+          ,
+          placeholder="password"
+        />
+        <button onclick="SignIn()">Submit</button>
+      </div>
     </div>
 
-    <div>
-      <h2>SignIn</h2>
+    <div id="dashboard-section" style="display: none;">
+      
+        <h3 id="userinfo"></h3>
+      
 
-      <input
-        type="text"
-        id="signin-username"
-        name="signin-username"
-        ,
-        placeholder="username"
-      />
-      <input
-        type="text"
-        id="signin-password"
-        name="signin-password"
-        ,
-        placeholder="password"
-      />
-      <button onclick="SignIn()">Submit</button>
-    </div>
+      <div id="add-todo">
+        <input id="todo-input" type="text" placeholder="Enter todo title" />
+        <button onclick="addTodo()">Add Todo</button>
 
-    <div>
-      <h2>User info</h2>
-      <h6 id="userinfo"></h6>
+        <ul id="todo-list"></ul>
+      </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
