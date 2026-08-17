@@ -1,10 +1,27 @@
+require("dotenv").config();
+
 const express = require("express");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
+
+const { auth } = require("./auth");
+const { UserModel, TodoModel } = require("./db");
 
 const app = express();
 app.use(express.json());
-const JWT_SECRET = "bhaveshchavda";
+app.use(express.static("public"));
 
+// MongoDB connection
+mongoose
+  .connect(process.env.MONGO_URL)
+  .then(() => {
+    console.log("connected to mongoDB atlas successfully! 🍃");
+  })
+  .catch((error) => {
+    console.error("failed to connect to MongoDB: ", error);
+  });
+
+// In-memory Variables
 const users = [];
 const todos = [
   {
@@ -14,7 +31,6 @@ const todos = [
   },
 ];
 const requestLog = [];
-app.use(express.static("public"));
 
 //logger
 function logger(req, res, next) {
@@ -27,36 +43,47 @@ function logger(req, res, next) {
 }
 
 //signup
-app.post("/signup", logger, function (req, res) {
+app.post("/signup", logger, async function (req, res) {
   const username = req.body.username;
   const password = req.body.password;
 
-  users.push({
-    username: username,
-    password: password,
-  });
+  if (!username || !password) {
+    return res.status(401).json({
+      message: "add creadicials",
+    });
+  }
 
-  res.status(201).json({
-    Message: "you have signup",
-  });
+  try {
+    await UserModel.create({
+      username: username,
+      password: password,
+    });
+
+    res.status(201).json({
+      Message: "you have signup",
+    });
+  } catch (error) {
+    console.error("mongo add user error: ", error);
+  }
 });
 
 //signin
-app.post("/signin", logger, function (req, res) {
+app.post("/signin", logger, async function (req, res) {
   const username = req.body.username;
   const password = req.body.password;
 
-  const founduser = users.find(
-    (u) => u.username === username && u.password === password,
-  );
+  try {
+    const response = await UserModel.findOne({
+      username: username,
+      password: password,
+    });
 
-  if (founduser) {
-    try {
+    if (response) {
       const token = jwt.sign(
         {
-          username: founduser.username,
+          Id: response._id.toString(),
         },
-        JWT_SECRET,
+        process.env.JWT_SECRET,
       );
 
       res.header("token", token);
@@ -65,64 +92,72 @@ app.post("/signin", logger, function (req, res) {
         token: token,
         Massage: "You are signed in",
       });
-    } catch (error) {
-      console.error(error);
+    } else {
+      res.status(403).send({
+        message: "Invalid Token",
+      });
     }
-  } else {
-    res.status(403).send({
-      message: "Invalid Token",
-    });
+  } catch (error) {
+    console.error("mongo Error", error);
   }
 });
 
-//auth
-function auth(req, res, next) {
-  const token = req.headers.token;
-
-  if (!token) {
-    return res.status(401).send({
-      message: "token is missing",
-    });
-  }
-
-  const decodedToken = jwt.verify(token, JWT_SECRET);
-
-  if (decodedToken.username) {
-    req.username = decodedToken.username;
-    next();
-  } else {
-    res.json({
-      message: "you are not logged in",
-    });
-  }
-}
-
 //me
-app.get("/me", logger, auth, function (req, res) {
-  const currentUser = req.username;
-  const foundUser = users.find((u) => u.username === currentUser);
+app.get("/me", logger, auth, async function (req, res) {
+  try {
+    const Id = req.userId;
 
-  res.json({
-    username: foundUser.username,
-  });
+    const user = await UserModel.findById(Id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.json({
+      username: user.username,
+    });
+  } catch (error) {
+    console.error("Error in /me: ", error);
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
+  }
 });
 
 //todos
-app.get("/todos", logger, auth, function (req, res) {
-  const currentuser = req.username;
+app.get("/todos", logger, auth, async function (req, res) {
+  const userId = req.userId;
 
-  const usertodos = todos.filter((todo) => todo.username === currentuser);
+  try {
+    const Todosdata = await TodoModel.find({
+      userId,
+    });
 
-  res.json({
-    todos: usertodos,
-  });
+    if (!Todosdata) {
+      return res.status(401).json({
+        message: "error in get todos",
+      });
+    }
+
+    console.log(Todosdata);
+
+    res.json({
+      todos: Todosdata
+    })
+  } catch (error) {
+    res.status(401).json({
+      message: "didnt fetch todos mongo error",
+    });
+  }
 });
 
 //todo
-app.post("/todo", logger, auth, function (req, res) {
-  const currentuser = req.username;
-  // Accept either 'title' or 'todo' from body
-  const title = req.body.title || req.body.todo;
+app.post("/todo", logger, auth, async function (req, res) {
+  const userId = req.userId;
+  const title = req.body.title;
 
   // 1. Input Validation
   if (!title) {
@@ -132,24 +167,17 @@ app.post("/todo", logger, auth, function (req, res) {
   }
 
   try {
-    const todoObj = {
-      id: Date.now(), // Safe unique ID using timestamp
-      title: title,
-      completed: false,
-      username: currentuser,
-    };
+    await TodoModel.create({
+      userId,
+      title,
+      done: false,
+    });
 
-    todos.push(todoObj);
-
-    // 2. Return 201 Created Status
     res.status(201).json({
-      todoitem: todoObj,
+      message: "todo is created",
     });
   } catch (error) {
-    console.error("Error creating todo:", error);
-    res.status(500).json({
-      message: "Internal server error",
-    });
+    console.error("todo add Error: ", error);
   }
 });
 
