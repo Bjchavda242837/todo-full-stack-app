@@ -1,18 +1,29 @@
 async function SignUp() {
-  const username = document.getElementById("signup-username").value;
-  const password = document.getElementById("signup-password").value;
+  const usernameInput = document.getElementById("signup-username");
+  const passwordInput = document.getElementById("signup-password");
+
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value;
 
   if (!username || !password) {
     console.log("please enter your cradencials");
     return;
   }
-  const response = await axios.post("http://localhost:3000/signup", {
-    username: username,
-    password: password,
-  });
 
-  alert(response.data.Message);
-  console.log(response);
+  try {
+    const response = await axios.post("http://localhost:3000/signup", {
+      username: username,
+      password: password,
+    });
+
+    alert(response.data.Message);
+
+    usernameInput.value = "";
+    passwordInput.value = "";
+  } catch (error) {
+    console.error("Signup error:", error);
+    alert(error.response?.data?.message || "Signup failed");
+  }
 }
 
 async function SignIn() {
@@ -31,12 +42,16 @@ async function SignIn() {
 
   localStorage.setItem("token", response.data.token);
 
-  MEendpoint();
+  MeEndpoint();
 
   alert(response.data.Massage);
+
+  document.getElementById("signin-username").value = "";
+document.getElementById("signin-password").value = "";
+
 }
 
-async function MEendpoint() {
+async function MeEndpoint() {
   try {
     const response = await axios.get("http://localhost:3000/me", {
       headers: {
@@ -46,7 +61,7 @@ async function MEendpoint() {
 
     document.getElementById("userinfo").innerText = response.data.username;
     showDashboard();
-    getTodos()
+    getTodos();
   } catch (error) {
     console.error(error);
   }
@@ -54,27 +69,29 @@ async function MEendpoint() {
 
 async function addTodo() {
   const title = document.getElementById("todo-input").value;
-  const token = localStorage.getItem("token")
-
-  console.log(token);
-  
-
+  const token = localStorage.getItem("token");
 
   if (!title) {
     console.log("please enter title");
-
   } else {
     try {
       const response = await axios.post(
-      "http://localhost:3000/todo",
-      { title: title },              // 👈 Arg 2: Body payload sent to req.body
-      { headers: { token: token } }  // 👈 Arg 3: Config sent to req.headers
-    );
-      getTodos()
+        "http://localhost:3000/todo",
+        { title: title },
+        { headers: { token: token } },
+      );
+      getTodos();
+
+      
+
     } catch (error) {
       console.error("addtodo error " + error);
     }
   }
+
+  document.getElementById("todo-input").value = "";
+
+  
 }
 
 async function getTodos() {
@@ -85,17 +102,16 @@ async function getTodos() {
       },
     });
 
-    const todolist = response.data.todos
+    const todolist = response.data.todos;
 
-    const tododiv = document.getElementById('todo-list')
-    tododiv.innerHTML = ""
+    const tododiv = document.getElementById("todo-list");
+    tododiv.innerHTML = "";
 
-    todolist.forEach(todo => {
-      const li = document.createElement("li")
-      li.textContent = todo.title
-      tododiv.appendChild(li)
+    todolist.forEach((todo) => {
+      const li = document.createElement("li");
+      li.textContent = todo.title;
+      tododiv.appendChild(li);
     });
-    
   } catch (error) {
     console.error("Error fetching todos:", error);
   }

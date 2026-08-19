@@ -1,12 +1,17 @@
 require("dotenv").config();
 
+// libraries import
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
+const { z } = require("zod");
 
+// import modules
 const { auth } = require("./auth");
 const { UserModel, TodoModel } = require("./db");
 
+// instances
 const app = express();
 app.use(express.json());
 app.use(express.static("public"));
@@ -21,42 +26,56 @@ mongoose
     console.error("failed to connect to MongoDB: ", error);
   });
 
-// In-memory Variables
-const users = [];
-const todos = [
-  {
-    id: 1,
-    title: "buy milk",
-    username: "bhavesh",
-  },
-];
-const requestLog = [];
+// define zod schema
+const signupSchema = z.object({
+  username: z.string().min(3).max(20),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters long")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number "),
+});
+
+const signinSchema = z.object({
+  username: z.string(),
+  password: z.string(),
+});
 
 //logger
 function logger(req, res, next) {
   const requestmethod = req.method;
-  requestLog.push({
-    requestmethod: requestmethod,
-  });
   console.log(requestmethod + "request came");
   next();
 }
 
 //signup
 app.post("/signup", logger, async function (req, res) {
-  const username = req.body.username;
-  const password = req.body.password;
+  // validate input
+  const validation = signupSchema.safeParse(req.body);
 
-  if (!username || !password) {
-    return res.status(401).json({
-      message: "add creadicials",
+  // validation check
+  if (!validation.success) {
+    return res.status(400).json({
+      message: "validation failed",
+      error: validation.error.issues.map((err) => ({
+        field: err.path.join("."),
+        message: err.message,
+      })),
     });
   }
 
+  // validation response store in variables
+  const username = validation.data.username;
+  const password = validation.data.password;
+
+  //password hashing with bcrypt
+  const hashedpassword = await bcrypt.hash(password, 5);
+
+  // save to db
   try {
     await UserModel.create({
       username: username,
-      password: password,
+      password: hashedpassword,
     });
 
     res.status(201).json({
@@ -64,41 +83,62 @@ app.post("/signup", logger, async function (req, res) {
     });
   } catch (error) {
     console.error("mongo add user error: ", error);
+    return res.status(500).json({
+    message: "Failed to create user (username may already exist)",
+    error: error.message,
+  });
   }
 });
 
 //signin
 app.post("/signin", logger, async function (req, res) {
-  const username = req.body.username;
-  const password = req.body.password;
+  const validation = signinSchema.safeParse(req.body);
+
+  if (!validation.success) {
+    return res.status(400).json({
+      message: "Invalid input",
+      errors: validation.error.issues,
+    });
+  }
+
+  const { username, password } = validation.data;
 
   try {
-    const response = await UserModel.findOne({
+    // 1. Search by username ONLY
+    const user = await UserModel.findOne({
       username: username,
-      password: password,
     });
 
-    if (response) {
-      const token = jwt.sign(
-        {
-          Id: response._id.toString(),
-        },
-        process.env.JWT_SECRET,
-      );
-
-      res.header("token", token);
-
-      res.json({
-        token: token,
-        Massage: "You are signed in",
-      });
-    } else {
-      res.status(403).send({
-        message: "Invalid Token",
-      });
+    // 2. Check if user exists
+    if (!user) {
+      return res.status(403).json({ message: "Invalid credentials" });
     }
+
+    // 3. Compare plain password with stored bcrypt hash
+    const iMatch = await bcrypt.compare(password, user.password);
+
+    if (!iMatch) {
+      return res.status(403).json({ message: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      {
+        Id: user._id.toString(),
+      },
+      process.env.JWT_SECRET,
+    );
+
+    res.header("token", token);
+
+    res.json({
+      token: token,
+      Massage: "You are signed in",
+    });
+
+
   } catch (error) {
     console.error("mongo Error", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -142,11 +182,9 @@ app.get("/todos", logger, auth, async function (req, res) {
       });
     }
 
-    console.log(Todosdata);
-
     res.json({
-      todos: Todosdata
-    })
+      todos: Todosdata,
+    });
   } catch (error) {
     res.status(401).json({
       message: "didnt fetch todos mongo error",
@@ -178,6 +216,10 @@ app.post("/todo", logger, auth, async function (req, res) {
     });
   } catch (error) {
     console.error("todo add Error: ", error);
+    return res.status(500).json({
+    message: "Failed to create todo",
+    error: error.message,
+  });
   }
 });
 
